@@ -14,9 +14,24 @@
 #include <linux/platform_device.h>
 #include <linux/slab.h>
 #include <linux/of_gpio.h>
+#include <linux/i2c.h>
+#include <linux/regmap.h>
 
 #include <video/omapdss.h>
 #include <video/omap-panel-data.h>
+
+#define TFP410_I2C_NAME "tfp410"
+
+/* I2C registers */
+#define TFP410_VEN_ID_L		0x00
+#define TFP410_VEN_ID_H		0x01
+#define TFP410_DEV_ID_L		0x02
+#define TFP410_DEV_ID_H		0x03
+#define TFP410_REV_ID		0x04
+#define TFP410_CTL_1_MODE	0x08
+#define TFP410_CTL_2_MODE	0x09
+#define TFP410_CTL_3_MODE	0x0A
+#define TFP410_CFG		0x0B
 
 struct panel_drv_data {
 	struct omap_dss_device dssdev;
@@ -313,7 +328,89 @@ static struct platform_driver tfp410_driver = {
 	},
 };
 
-module_platform_driver(tfp410_driver);
+static const struct regmap_config tfp410_regmap_config = {
+	.reg_bits = 8,
+	.val_bits = 8,
+};
+
+static int tfp410_i2c_probe(struct i2c_client *client,
+			    const struct i2c_device_id *id)
+{
+	struct regmap *regmap;
+	uint8_t chip_id[4];
+	int r;
+
+	/* The regmap is not saved as it is only used by probe */
+	regmap = devm_regmap_init_i2c(client, &tfp410_regmap_config);
+	if (IS_ERR(regmap)) {
+		r = PTR_ERR(regmap);
+		dev_err(&client->dev, "Failed to init regmap (%d)\n", r);
+		return r;
+	}
+
+	/* Check the device ID */
+	r = regmap_bulk_read(regmap, TFP410_VEN_ID_L, chip_id, 4);
+	if (r < 0) {
+		dev_err(&client->dev, "Failed to read device ID (%d)\n", r);
+		return r;
+	}
+
+	if (!(chip_id[0] == 0x4c && chip_id[1] == 0x01 &&
+	      chip_id[2] == 0x10 && chip_id[3] == 0x04)) {
+		dev_err(&client->dev, "Unrecognised device "
+			"(VEN_ID=0x%02x%02x, DEV_ID=0x%02x%02x)\n",
+			chip_id[1], chip_id[0], chip_id[3], chip_id[2]);
+		return -ENODEV;
+	}
+
+	/* Enable normal operation */
+	r = regmap_update_bits(regmap, TFP410_CTL_1_MODE, 0x7f, 0x37);
+	if (r < 0) {
+		dev_err(&client->dev, "Failed to set CTL_1_MODE (%d)\n", r);
+	}
+
+	return r;
+}
+
+static const struct i2c_device_id tfp410_i2c_id[] = {
+	{ TFP410_I2C_NAME, 0 },
+	{ }
+};
+MODULE_DEVICE_TABLE(i2c, tfp410_i2c_id);
+
+static struct i2c_driver tfp410_i2c_driver = {
+	.driver = {
+		.owner	= THIS_MODULE,
+		.name	= TFP410_I2C_NAME,
+		.of_match_table = tfp410_of_match,
+	},
+	.id_table	= tfp410_i2c_id,
+	.probe		= tfp410_i2c_probe,
+};
+
+static int __init tfp410_init(void)
+{
+	int err;
+
+	err = i2c_add_driver(&tfp410_i2c_driver);
+	if (err != 0)
+		pr_err("tfp410: Failed to register I2C driver (%d)\n", err);
+
+	err = platform_driver_register(&tfp410_driver);
+	if (err != 0)
+		pr_err("tfp410: Failed to register platform driver (%d)\n",
+		       err);
+
+	return 0;
+}
+module_init(tfp410_init);
+
+static void __exit tfp410_exit(void)
+{
+	platform_driver_unregister(&tfp410_driver);
+	i2c_del_driver(&tfp410_i2c_driver);
+}
+module_exit(tfp410_exit);
 
 MODULE_AUTHOR("Tomi Valkeinen <tomi.valkeinen@ti.com>");
 MODULE_DESCRIPTION("TFP410 DPI to DVI encoder driver");
