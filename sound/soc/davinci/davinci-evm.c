@@ -105,6 +105,11 @@ static struct snd_soc_ops evm_tda998x_ops = {
 	.shutdown = evm_shutdown,
 };
 
+static struct snd_soc_ops titanium_ops = {
+	.startup = evm_startup,
+	.shutdown = evm_shutdown,
+};
+
 /* davinci-evm machine dapm widgets */
 static const struct snd_soc_dapm_widget aic3x_dapm_widgets[] = {
 	SND_SOC_DAPM_HP("Headphone Jack", NULL),
@@ -162,6 +167,28 @@ static int evm_aic3x_init(struct snd_soc_pcm_runtime *rtd)
 	snd_soc_dapm_nc_pin(&card->dapm, "HPRCOM");
 
 	return 0;
+}
+
+static int evm_titanium_init(struct snd_soc_pcm_runtime *rtd)
+{
+	struct snd_soc_dai *codec_dai = rtd->codec_dai;
+	struct snd_soc_dai *cpu_dai = rtd->cpu_dai;
+	struct snd_soc_card *soc_card = rtd->card;
+	int ret = 0;
+	unsigned sysclk = ((struct snd_soc_card_drvdata_davinci *)
+			   snd_soc_card_get_drvdata(soc_card))->sysclk;
+
+	/* Set MCLK as clock source for TLV320AIC3107 codec */
+	ret = snd_soc_dai_set_sysclk(codec_dai, 0, sysclk, SND_SOC_CLOCK_IN);
+	if (ret < 0)
+		return ret;
+
+	/* Set McASP sysclk from AHCLKX sourced from ABE */
+	ret = snd_soc_dai_set_sysclk(cpu_dai, 0, sysclk, SND_SOC_CLOCK_OUT);
+	if (ret < 0)
+		return ret;
+
+	return evm_aic3x_init(rtd);
 }
 
 static const struct snd_soc_dapm_widget tda998x_dapm_widgets[] = {
@@ -408,6 +435,16 @@ static struct snd_soc_dai_link evm_dai_tda998x_hdmi = {
 			   SND_SOC_DAIFMT_IB_NF),
 };
 
+static struct snd_soc_dai_link titanium_link = {
+	.name		= "TLV320AIC3X",
+	.stream_name	= "AIC3X",
+	.codec_dai_name	= "tlv320aic3x-hifi",
+	.ops		= &titanium_ops,
+	.init		= evm_titanium_init,
+	.dai_fmt = SND_SOC_DAIFMT_DSP_B | SND_SOC_DAIFMT_CBS_CFS |
+		   SND_SOC_DAIFMT_IB_NF,
+};
+
 static const struct of_device_id davinci_evm_dt_ids[] = {
 	{
 		.compatible = "ti,da830-evm-audio",
@@ -416,6 +453,10 @@ static const struct of_device_id davinci_evm_dt_ids[] = {
 	{
 		.compatible = "ti,beaglebone-black-audio",
 		.data = &evm_dai_tda998x_hdmi,
+	},
+	{
+		.compatible = "ti,titanium-audio",
+		.data = &titanium_link,
 	},
 	{ /* sentinel */ }
 };
@@ -447,7 +488,9 @@ static int davinci_evm_probe(struct platform_device *pdev)
 	if (!dai->cpu_of_node)
 		return -EINVAL;
 
-	dai->platform_of_node = dai->cpu_of_node;
+	/* Only set the platform_of_node if the platform_name is not set */
+	if (!dai->platform_name)
+		dai->platform_of_node = dai->cpu_of_node;
 
 	evm_soc_card.dev = &pdev->dev;
 	ret = snd_soc_of_parse_card_name(&evm_soc_card, "ti,model");
