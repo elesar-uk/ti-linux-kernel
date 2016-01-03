@@ -15,6 +15,7 @@
 #include <linux/clk.h>
 #include <linux/clkdev.h>
 #include <linux/clk/ti.h>
+#include <linux/of.h>
 
 #define DRA7_DPLL_ABE_DEFFREQ				180633600
 #define DRA7_DPLL_GMAC_DEFFREQ				1000000000
@@ -313,10 +314,27 @@ static struct ti_dt_clk dra7xx_clks[] = {
 	{ .node_name = NULL },
 };
 
+static const char *get_parent_name(const char *clock, const char *parent)
+{
+	/* If the specified clock has a "ti,parent" property this name
+	   overrides the default parent name. */
+	struct device_node *node = of_find_node_by_name(NULL, clock);
+	if (node != NULL) {
+		const char *name;
+
+		if (of_property_read_string(node, "ti,parent", &name) == 0)
+			parent = name;
+		of_node_put(node);
+	}
+
+	return parent;
+}
+
 int __init dra7xx_dt_clk_init(void)
 {
 	int rc;
-	struct clk *abe_dpll_mux, *sys_clkin2, *dpll_ck, *hdcp_ck;
+	const char *abe_parent_name;
+	struct clk *abe_dpll_mux, *abe_parent, *dpll_ck, *hdcp_ck;
 	struct clk *atl_fck, *atl_parent;
 
 	ti_dt_clocks_register(dra7xx_clks);
@@ -324,10 +342,11 @@ int __init dra7xx_dt_clk_init(void)
 	omap2_clk_disable_autoidle_all();
 
 	abe_dpll_mux = clk_get_sys(NULL, "abe_dpll_sys_clk_mux");
-	sys_clkin2 = clk_get_sys(NULL, "sys_clkin2");
+	abe_parent_name = get_parent_name("abe_dpll_sys_clk_mux", "sys_clkin2");
+	abe_parent = clk_get_sys(NULL, abe_parent_name);
 	dpll_ck = clk_get_sys(NULL, "dpll_abe_ck");
 
-	rc = clk_set_parent(abe_dpll_mux, sys_clkin2);
+	rc = clk_set_parent(abe_dpll_mux, abe_parent);
 	if (!rc)
 		rc = clk_set_rate(dpll_ck, DRA7_DPLL_ABE_DEFFREQ);
 	if (rc)
