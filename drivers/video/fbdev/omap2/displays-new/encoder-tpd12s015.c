@@ -27,6 +27,7 @@ struct panel_drv_data {
 	int ct_cp_hpd_gpio;
 	int ls_oe_gpio;
 	int hpd_gpio;
+	bool hpd_pin_active_low;
 
 	struct omap_video_timings timings;
 };
@@ -138,6 +139,12 @@ static int tpd_check_timings(struct omap_dss_device *dssdev,
 	return r;
 }
 
+static inline int tpd_read_hpd(struct panel_drv_data *ddata)
+{
+	int val = gpio_get_value_cansleep(ddata->hpd_gpio);
+	return (ddata->hpd_pin_active_low ? !val : val);
+}
+
 static int tpd_read_edid(struct omap_dss_device *dssdev,
 		u8 *edid, int len)
 {
@@ -145,7 +152,7 @@ static int tpd_read_edid(struct omap_dss_device *dssdev,
 	struct omap_dss_device *in = ddata->in;
 	int r;
 
-	if (!gpio_get_value_cansleep(ddata->hpd_gpio))
+	if (!tpd_read_hpd(ddata))
 		return -ENODEV;
 
 	if (gpio_is_valid(ddata->ls_oe_gpio))
@@ -163,7 +170,7 @@ static bool tpd_detect(struct omap_dss_device *dssdev)
 {
 	struct panel_drv_data *ddata = to_panel_data(dssdev);
 
-	return gpio_get_value_cansleep(ddata->hpd_gpio);
+	return tpd_read_hpd(ddata);
 }
 
 static int tpd_set_infoframe(struct omap_dss_device *dssdev,
@@ -212,6 +219,7 @@ static int tpd_probe_pdata(struct platform_device *pdev)
 	ddata->ct_cp_hpd_gpio = pdata->ct_cp_hpd_gpio;
 	ddata->ls_oe_gpio = pdata->ls_oe_gpio;
 	ddata->hpd_gpio = pdata->hpd_gpio;
+	ddata->hpd_pin_active_low = false;
 
 	in = omap_dss_find_output(pdata->source);
 	if (in == NULL) {
@@ -233,6 +241,7 @@ static int tpd_probe_of(struct platform_device *pdev)
 	struct device_node *node = pdev->dev.of_node;
 	struct omap_dss_device *in;
 	int gpio;
+	enum of_gpio_flags flags;
 
 	/* CT CP HPD GPIO */
 	gpio = of_get_gpio(node, 0);
@@ -252,12 +261,13 @@ static int tpd_probe_of(struct platform_device *pdev)
 	}
 
 	/* HPD GPIO */
-	gpio = of_get_gpio(node, 2);
+	gpio = of_get_gpio_flags(node, 2, &flags);
 	if (!gpio_is_valid(gpio)) {
 		dev_err(&pdev->dev, "failed to parse HPD gpio\n");
 		return gpio;
 	}
 	ddata->hpd_gpio = gpio;
+	ddata->hpd_pin_active_low = (flags == OF_GPIO_ACTIVE_LOW);
 
 	in = omapdss_of_find_source_for_first_ep(node);
 	if (IS_ERR(in)) {
