@@ -440,6 +440,7 @@ dtb-$(CONFIG_SOC_DRA7XX) += \
 	dra7-evm-lcd-lg.dtb \
 	dra7-evm-lcd-osd.dtb \
 	am57xx-beagle-x15.dtb \
+	am57xx-titanium.dtb \
 	dra72-evm.dtb \
 	dra72-evm-lcd-lg.dtb \
 	dra72-evm-lcd-osd.dtb \
