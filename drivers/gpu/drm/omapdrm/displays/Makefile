@@ -1,6 +1,7 @@
 # SPDX-License-Identifier: GPL-2.0
 obj-$(CONFIG_DRM_OMAP_ENCODER_OPA362) += encoder-opa362.o
 obj-$(CONFIG_DRM_OMAP_ENCODER_TFP410) += encoder-tfp410.o
+obj-$(CONFIG_DRM_OMAP_ENCODER_HDMITODVI) += encoder-hdmitodvi.o
 obj-$(CONFIG_DRM_OMAP_ENCODER_TPD12S015) += encoder-tpd12s015.o
 obj-$(CONFIG_DRM_OMAP_DRA7EVM_ENCODER_TPD12S015) += dra7-evm-encoder-tpd12s015.o
 obj-$(CONFIG_DRM_OMAP_ENCODER_TC358768) += encoder-tc358768.o
