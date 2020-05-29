@@ -2039,6 +2039,8 @@
 				ti,hwmods = "davinci_mdio";
 				bus_freq = <1000000>;
 				reg = <0x48485000 0x100>;
+				clocks = <&gmac_main_clk>;
+				clock-names = "fck";
 			};
 
 			cpsw_emac0: slave@48480200 {
