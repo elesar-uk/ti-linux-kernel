@@ -677,6 +677,8 @@
 			ti,hwmods = "uart7";
 			clock-frequency = <48000000>;
 			status = "disabled";
+			dmas = <&sdma_xbar 144>, <&sdma_xbar 145>;
+			dma-names = "tx", "rx";
 		};
 
 		uart8: serial@48422000 {
@@ -686,6 +688,8 @@
 			ti,hwmods = "uart8";
 			clock-frequency = <48000000>;
 			status = "disabled";
+			dmas = <&sdma_xbar 146>, <&sdma_xbar 147>;
+			dma-names = "tx", "rx";
 		};
 
 		uart9: serial@48424000 {
