@@ -423,15 +423,30 @@ static void palmas_dt_to_pdata(struct i2c_client *i2c,
 
 	pdata->pm_off = of_property_read_bool(node,
 			"ti,system-power-controller");
+	if (of_device_is_compatible(node, "elesar,softoff")) {
+		pdata->pwroff_gpio = devm_gpiod_get(&i2c->dev, NULL, GPIOD_OUT_LOW);
+		if (IS_ERR_OR_NULL(pdata->pwroff_gpio)) {
+			dev_err(&i2c->dev, "%s: failed to get softoff gpio (%ld)",
+				__func__, PTR_ERR(pdata->pwroff_gpio));
+			pdata->pwroff_gpio = NULL;
+		}
+	}
 }
 
 static struct palmas *palmas_dev;
+static struct gpio_desc *pwroff_gpio;
 static void palmas_power_off(void)
 {
 	unsigned int addr;
 	int ret, slave;
 	u8 powerhold_mask;
 	struct device_node *np = palmas_dev->dev->of_node;
+
+	if (pwroff_gpio) {
+		/* Assert poweroff signal for Elesar Titanium */
+		gpiod_set_value(pwroff_gpio, 1);
+		mdelay(20);
+	}
 
 	if (of_property_read_bool(np, "ti,palmas-override-powerhold")) {
 		addr = PALMAS_BASE_TO_REG(PALMAS_PU_PD_OD_BASE,
@@ -689,6 +704,7 @@ no_irq:
 			goto err_irq;
 		} else if (pdata->pm_off && !pm_power_off) {
 			palmas_dev = palmas;
+			pwroff_gpio = pdata->pwroff_gpio;
 			pm_power_off = palmas_power_off;
 		}
 	}

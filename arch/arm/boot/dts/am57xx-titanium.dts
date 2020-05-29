@@ -256,7 +256,7 @@
 	};
 
 	tps659038: tps659038@58 {
-		compatible = "ti,tps659038";
+		compatible = "ti,tps659038", "elesar,softoff";
 		reg = <0x58>;
 		ti,palmas-override-powerhold;
 		ti,system-power-controller;
@@ -267,6 +267,9 @@
 		 */
 		interrupt-parent = <&gpio7>;
 		interrupts = <10 IRQ_TYPE_NONE>;
+
+		/* Soft power-off line */
+		gpios = <&gpio7 7 GPIO_ACTIVE_HIGH>;
 
 		tps659038_pmic {
 			compatible = "ti,tps659038-pmic";

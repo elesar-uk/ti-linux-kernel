@@ -410,6 +410,7 @@ struct palmas_platform_data {
 	struct palmas_usb_platform_data *usb_pdata;
 	struct palmas_resource_platform_data *resource_pdata;
 	struct palmas_clk_platform_data *clk_pdata;
+	struct gpio_desc *pwroff_gpio;
 };
 
 struct palmas_gpadc_calibration {
