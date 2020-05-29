@@ -65,6 +65,8 @@ static int omap_fbdev_pan_display(struct fb_var_screeninfo *var,
 	if (!fbdev->ywrap_enabled)
 		goto fallback;
 
+	fbi->var.yoffset = var->yoffset;
+
 	if (drm_can_sleep()) {
 		pan_worker(&fbdev->work);
 	} else {
